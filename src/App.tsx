@@ -15,8 +15,22 @@ import { ChatArea } from './components/ChatArea';
 import { ImagePromptTab } from './components/ImagePromptTab';
 
 const parseAIResponse = (data: any) => {
+  console.log("Raw response:", data);
+  if (!data) return "Gagal membaca respons AI";
   if (typeof data === 'string') return data;
-  return data.result || data.response || data.message || JSON.stringify(data);
+
+  const replyText =
+    data.reply ??
+    data.result ??
+    data.response ??
+    data.message ??
+    data.text;
+
+  if (typeof replyText === 'string') {
+    return replyText;
+  }
+
+  return "Gagal membaca respons AI";
 };
 
 export function MainApp() {
@@ -25,6 +39,7 @@ export function MainApp() {
   const [darkMode, setDarkMode] = useState(true);
   const [activeTab, setActiveTab] = useState<'chat' | 'image'>('chat');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [chats, setChats] = useState<Chat[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -219,21 +234,32 @@ export function MainApp() {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="relative group">
-              <button className="flex items-center gap-2 px-4 py-1.5 rounded-lg border border-pink-500/50 bg-pink-500/10 text-pink-500 text-[11px] font-bold tracking-tight uppercase cursor-pointer">
+            <div className="relative">
+              <button 
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="flex items-center gap-2 px-4 py-1.5 rounded-lg border border-pink-500/50 bg-pink-500/10 text-pink-500 text-[11px] font-bold tracking-tight uppercase cursor-pointer"
+              >
                 {selectedModel.name} <ChevronDown size={14} strokeWidth={2.5} />
               </button>
-              <div className="absolute right-0 top-full mt-2 w-48 bg-[#15151E] border border-white/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden">
-                {MODELS.map(m => (
-                  <button 
-                    key={m.id}
-                    onClick={() => setSelectedModel(m)}
-                    className="w-full text-left px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-white/5 transition-colors border-l-4 border-transparent hover:border-pink-500 cursor-pointer bg-transparent"
-                  >
-                    {m.name}
-                  </button>
-                ))}
-              </div>
+              {isDropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)}></div>
+                  <div className="absolute right-0 top-full mt-2 w-48 bg-[#15151E] border border-white/10 rounded-xl shadow-2xl transition-all z-50 overflow-hidden">
+                    {MODELS.map(m => (
+                      <button 
+                        key={m.id}
+                        onClick={() => {
+                          setSelectedModel(m);
+                          setIsDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-white/5 transition-colors border-l-4 border-transparent hover:border-pink-500 cursor-pointer bg-transparent"
+                      >
+                        {m.name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
             
             <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 bg-white/5 md:hidden rounded-lg text-slate-400 border border-white/5 cursor-pointer flex items-center justify-center hover:bg-white/10">
