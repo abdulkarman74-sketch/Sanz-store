@@ -1,13 +1,12 @@
 import React from 'react';
-import { Plus, MessageSquare, Trash2, User, LogOut, Sun, Moon, Sparkles } from 'lucide-react';
-import { auth, db } from '../firebase';
-import { signOut } from 'firebase/auth';
+import { Plus, MessageSquare, Trash2, User, Sun, Moon, Sparkles } from 'lucide-react';
+import { db } from '../firebase';
 import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { Chat, UserData } from '../types';
+import { Chat } from '../types';
 import { useToast } from './ToastProvider';
 
 interface SidebarProps {
-  user: UserData;
+  userId: string;
   chats: Chat[];
   currentChatId: string | null;
   sidebarOpen: boolean;
@@ -20,16 +19,12 @@ interface SidebarProps {
 }
 
 export const Sidebar = ({
-  user, chats, currentChatId, sidebarOpen, setSidebarOpen, handleNewChat, setCurrentChatId, setActiveTab, darkMode, setDarkMode
+  userId, chats, currentChatId, sidebarOpen, setSidebarOpen, handleNewChat, setCurrentChatId, setActiveTab, darkMode, setDarkMode
 }: SidebarProps) => {
   const { addToast } = useToast();
 
-  const toggleTheme = async () => {
-    const newTheme = !darkMode;
-    setDarkMode(newTheme);
-    if (user && user.uid) {
-      await updateDoc(doc(db, 'users', user.uid), { theme: newTheme ? 'dark' : 'light' });
-    }
+  const toggleTheme = () => {
+    setDarkMode(!darkMode);
   };
 
   const deleteChat = async (id: string, e: React.MouseEvent) => {
@@ -83,21 +78,6 @@ export const Sidebar = ({
             ))}
           </div>
         </div>
-      </div>
-
-      <div className="p-4 border-t border-white/5 flex items-center gap-3 bg-black/20">
-        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-orange-500 to-purple-600 p-[2px] shrink-0">
-          <div className="w-full h-full rounded-full bg-[#0A0A0F] flex items-center justify-center overflow-hidden font-bold text-xs uppercase text-white">
-            {user.photoURL ? <img src={user.photoURL} alt="pfp" className="w-full h-full object-cover" /> : user.displayName?.charAt(0) || user.email?.charAt(0) || <User size={16} />}
-          </div>
-        </div>
-        <div className="flex-1 overflow-hidden">
-          <p className="text-xs font-bold text-white truncate">{user.displayName || user.email}</p>
-          <p className="text-[10px] text-slate-500 truncate">Pro Account</p>
-        </div>
-        <button onClick={() => signOut(auth)} className="text-slate-500 hover:text-white cursor-pointer bg-transparent border-none">
-          <LogOut size={20} />
-        </button>
       </div>
     </aside>
   );

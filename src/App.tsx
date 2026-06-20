@@ -4,14 +4,12 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
-import { collection, addDoc, query, where, orderBy, onSnapshot, doc, updateDoc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, query, where, orderBy, onSnapshot, doc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { Menu, ChevronDown } from 'lucide-react';
-import { auth, db } from './firebase';
-import { MODELS, UserData, Chat, Message, Model } from './types';
+import { db } from './firebase';
+import { MODELS, Chat, Message, Model } from './types';
 import { ToastProvider, useToast } from './components/ToastProvider';
-import { AuthForm } from './components/AuthForm';
 import { Sidebar } from './components/Sidebar';
 import { ChatArea } from './components/ChatArea';
 import { ImagePromptTab } from './components/ImagePromptTab';
@@ -22,7 +20,7 @@ const parseAIResponse = (data: any) => {
 };
 
 export function MainApp() {
-  const [user, setUser] = useState<UserData | null>(null);
+  const [userId, setUserId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [darkMode, setDarkMode] = useState(true);
   const [activeTab, setActiveTab] = useState<'chat' | 'image'>('chat');
@@ -39,47 +37,27 @@ export function MainApp() {
   const { addToast } = useToast();
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      if (u) {
-        const userRef = doc(db, 'users', u.uid);
-        const userDoc = await getDoc(userRef);
-        if (!userDoc.exists()) {
-          const newUser = {
-            uid: u.uid,
-            email: u.email,
-            displayName: u.displayName,
-            photoURL: u.photoURL,
-            theme: 'dark' as const,
-            createdAt: serverTimestamp()
-          };
-          await setDoc(userRef, newUser);
-          setUser(newUser);
-          setDarkMode(true);
-        } else {
-          const data = userDoc.data() as UserData;
-          setUser({ ...data, uid: u.uid });
-          setDarkMode(data.theme === 'dark');
-        }
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
-    });
-    return unsub;
+    let uid = localStorage.getItem('phoenix_uid');
+    if (!uid) {
+      uid = uuidv4();
+      localStorage.setItem('phoenix_uid', uid);
+    }
+    setUserId(uid);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
     const q = query(
       collection(db, 'chats'),
-      where('userId', '==', user.uid),
+      where('userId', '==', userId),
       orderBy('updatedAt', 'desc')
     );
     const unsub = onSnapshot(q, (snapshot) => {
       setChats(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Chat)));
     });
     return unsub;
-  }, [user]);
+  }, [userId]);
 
   useEffect(() => {
     if (!currentChatId) {
@@ -115,7 +93,7 @@ export function MainApp() {
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isGenerating || !user) return;
+    if (!input.trim() || isGenerating || !userId) return;
 
     const userMsg: Message = { role: 'user', content: input, timestamp: new Date().toISOString() };
     let chatId = currentChatId;
@@ -123,7 +101,7 @@ export function MainApp() {
 
     if (!chatId) {
       const newChatData = {
-        userId: user.uid,
+        userId: userId,
         title: input.substring(0, 30),
         model: selectedModel.id,
         sessionId: currentSessionId,
@@ -184,7 +162,7 @@ export function MainApp() {
   };
 
   const handleGeneratePrompt = async () => {
-    if (!imagePromptInput.trim() || !user) return;
+    if (!imagePromptInput.trim() || !userId) return;
     setIsGenerating(true);
     try {
       const res = await fetch(`https://api.synoxcloud.xyz/ai-generate/text-to-prompt?q=${encodeURIComponent(imagePromptInput)}`);
@@ -193,7 +171,7 @@ export function MainApp() {
       const prompt = parseAIResponse(data);
       setGeneratedPrompt(prompt);
       await addDoc(collection(db, 'imagePrompts'), {
-        userId: user.uid,
+        userId: userId,
         inputQuery: imagePromptInput,
         generatedPrompt: prompt,
         createdAt: serverTimestamp()
@@ -212,12 +190,10 @@ export function MainApp() {
     </div>
   );
 
-  if (!user) return <AuthForm />;
-
   return (
     <div className="flex h-screen w-full bg-[#0A0A0F] text-slate-100 font-sans overflow-hidden">
       <Sidebar 
-        user={user} 
+        userId={userId} 
         chats={chats} 
         currentChatId={currentChatId} 
         sidebarOpen={sidebarOpen} 
