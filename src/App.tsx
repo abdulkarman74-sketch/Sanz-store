@@ -14,23 +14,41 @@ import { Sidebar } from './components/Sidebar';
 import { ChatArea } from './components/ChatArea';
 import { ImagePromptTab } from './components/ImagePromptTab';
 
-const parseAIResponse = (data: any) => {
-  console.log("Raw response:", data);
-  if (!data) return "Gagal membaca respons AI";
-  if (typeof data === 'string') return data;
+function extractReplyText(data: any): string | null {
+  if (typeof data === "string") return data;
 
-  const replyText =
-    data.reply ??
-    data.result ??
-    data.response ??
-    data.message ??
-    data.text;
-
-  if (typeof replyText === 'string') {
-    return replyText;
+  const commonKeys = ["reply", "result", "response", "message", "text", "answer", "output", "content"];
+  for (const key of commonKeys) {
+    if (data && data[key] && typeof data[key] === "string") return data[key];
   }
 
-  return "Gagal membaca respons AI";
+  if (typeof data === "object" && data !== null) {
+    for (const key of Object.keys(data)) {
+      if (typeof data[key] === "object" && data[key] !== null) {
+        for (const nestedKey of commonKeys) {
+          if (data[key][nestedKey] && typeof data[key][nestedKey] === "string") {
+            return data[key][nestedKey];
+          }
+        }
+      }
+    }
+  }
+
+  if (Array.isArray(data) && data.length > 0) {
+    return extractReplyText(data[0]);
+  }
+
+  return null;
+}
+
+const parseAIResponse = (data: any) => {
+  console.log("RAW RESPONSE:", JSON.stringify(data, null, 2));
+  const replyText = extractReplyText(data);
+  if (!replyText) {
+    console.error("Gagal extract teks dari struktur:", data);
+    throw new Error("PARSING_FAILED");
+  }
+  return replyText;
 };
 
 export function MainApp() {
@@ -161,8 +179,12 @@ export function MainApp() {
            updatedAt: serverTimestamp()
          });
       }
-    } catch (err) {
-      const errMsg: Message = { role: 'assistant', content: `Gagal mendapat respons dari ${selectedModel.name}, coba lagi ya 🔥`, timestamp: new Date().toISOString(), isError: true };
+    } catch (err: any) {
+      let errContent = `Gagal mendapat respons dari ${selectedModel.name}, coba lagi ya 🔥`;
+      if (err.message === "PARSING_FAILED") {
+        errContent = "Gagal membaca respons AI, cek console untuk detail struktur data.";
+      }
+      const errMsg: Message = { role: 'assistant', content: errContent, timestamp: new Date().toISOString(), isError: true };
       const updatedChatSnap = await getDoc(doc(db, 'chats', chatId));
       if (updatedChatSnap.exists()) {
          await updateDoc(doc(db, 'chats', chatId), {
